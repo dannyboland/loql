@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "clidb"
+version = "0.1.0"
+description = "CLI based SQL client for local data"
+authors = ["Danny Boland <email@dannyboland.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+textual = "0.1.*"
+textual-inputs = "0.2.*"
+duckdb = "^0.3.2"
+pandas = {version = "^1.3", optional = true}
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.941"
+black = "^22.1.0"
+pytest = "^7.1.1"
+pylint = "^2.12.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.extras]
+pandas = ["pandas"]
+
+[tool.poetry.scripts]
+clidb = "clidb.cli:CliDB.run"

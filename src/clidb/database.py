@@ -1,4 +1,5 @@
 import os
+from os import scandir
 from typing import List
 
 import duckdb
@@ -7,7 +8,8 @@ from rich.table import Table
 from rich.text import Text
 from textual._types import MessageTarget
 from textual.message import Message
-from textual.widgets import TreeClick, TreeControl
+from textual.widgets import DirectoryTree, TreeClick, TreeControl, TreeNode
+from textual.widgets._directory_tree import DirEntry
 
 try:
     import pandas as pd
@@ -17,6 +19,23 @@ else:
     _has_pd = True
 
 MAX_RESULT_LEN = 1024
+FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl"]
+
+
+class DataFileTree(DirectoryTree):
+    """A view for navigating relevant data files"""
+
+    async def load_directory(self, node: TreeNode[DirEntry]):
+        path = node.data.path
+        directory = sorted(
+            list(scandir(path)), key=lambda entry: (not entry.is_dir(), entry.name)
+        )
+        for entry in directory:
+            if entry.is_dir() or os.path.splitext(entry.path)[1] in FILETYPES:
+                await node.add(entry.name, DirEntry(entry.path, entry.is_dir()))
+        node.loaded = True
+        await node.expand()
+        self.refresh(layout=True)
 
 
 class DatabaseView(TreeControl):

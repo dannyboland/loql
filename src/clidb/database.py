@@ -1,4 +1,6 @@
+import importlib.util
 import os
+import sys
 from os import scandir
 from typing import List
 
@@ -11,12 +13,26 @@ from textual.message import Message
 from textual.widgets import DirectoryTree, TreeClick, TreeControl, TreeNode
 from textual.widgets._directory_tree import DirEntry
 
+
+def lazy_import(name):
+    """Delay importing heavy libraries until we need them"""
+    spec = importlib.util.find_spec(name)
+    if not spec:
+        raise ImportError
+
+    loader = importlib.util.LazyLoader(spec.loader)
+    spec.loader = loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    loader.exec_module(module)
+    return module
+
+
 try:
-    import pandas as pd
+    pd = lazy_import("pandas")
+    _has_pd = True
 except ImportError:
     _has_pd = False
-else:
-    _has_pd = True
 
 MAX_RESULT_LEN = 1024
 FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl"]
@@ -104,6 +120,13 @@ class DatabaseAdapter:
             raise ValueError
 
         return view_name
+
+    def load_clipboard_as_view(self) -> None:
+        """Creates a view of data from the clipboard"""
+        if not _has_pd:
+            raise ImportError("pandas")
+
+        self.con.register("clipboard", pd.read_clipboard())
 
     def query(self, query_str: str) -> ConsoleRenderable:
         """Returns the result of a query as a text table"""

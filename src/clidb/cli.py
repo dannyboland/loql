@@ -1,5 +1,6 @@
+import argparse
 import os
-import sys
+from logging import getLogger
 
 from rich.text import Text
 from textual.app import App
@@ -8,6 +9,8 @@ from textual.widgets import FileClick, ScrollView
 from textual_inputs import TextInput
 
 from clidb.database import DatabaseAdapter, DatabaseView, DataFileTree, ViewClick
+
+logger = getLogger()
 
 
 class CliDB(App):
@@ -18,17 +21,31 @@ class CliDB(App):
         await self.bind("q", "quit", "Quit")
         await self.bind("enter", "query", "Query")
 
-        try:
-            self.path = sys.argv[1]
-            if os.path.isdir(self.path):
-                self.dir = self.path
-            else:
-                self.dir = os.path.dirname(self.path) or os.getcwd()
-        except IndexError:
-            self.path = ""
-            self.dir = os.getcwd()
+        parser = argparse.ArgumentParser(
+            description="cli sql client for local data files."
+        )
+        parser.add_argument(
+            "path", nargs="?", default=os.getcwd(), help="path to display", type=str
+        )
+        parser.add_argument(
+            "--clipboard",
+            action="store_true",
+            help="Display clipboard contents as view.",
+        )
+        args = parser.parse_args()
+
+        self.path = args.path
 
         self.database = DatabaseAdapter()
+
+        if args.clipboard:
+            try:
+                self.database.load_clipboard_as_view()
+            except ImportError as import_error:
+                logger.error(
+                    f"Please install clidb[{import_error.msg}] for clipboard loading."
+                )
+                exit(1)
 
     async def on_mount(self) -> None:
         """Build the clidb interface"""
@@ -42,7 +59,13 @@ class CliDB(App):
         self.results_view = ScrollView(auto_width=True)
         self.database_view = DatabaseView("Views", data=self.database)
 
-        self.directory_view = DataFileTree(self.dir, "DirTree")
+        if os.path.isdir(self.path):
+            view_dir = self.path
+        else:
+            view_dir = os.path.dirname(self.path) or os.getcwd()
+            await self.call_later(self.read_file, self.path)
+
+        self.directory_view = DataFileTree(view_dir, "DirTree")
         self.sidebar = DockView()
 
         await self.view.dock(self.query_view, edge="top", size=3)
@@ -60,8 +83,6 @@ class CliDB(App):
         self.database_view.style = "green"
 
         await self.view.dock(self.results_view, edge="top")
-        if self.path:
-            await self.call_later(self.read_file, self.path)
 
     async def handle_view_click(self, message: ViewClick) -> None:
         """Catch view clicks from the Database view and run query on view"""
@@ -87,15 +108,14 @@ class CliDB(App):
         """Render a data file's contents"""
         try:
             view_name = self.database.load_file_as_view(filename)
+            await self.update_query(f'select * from "{view_name}"')
+            await self.action_query()
         except ImportError as import_error:
             await self.results_view.update(
                 Text(f"Please install clidb[{import_error.msg}]", justify="center")
             )
         except ValueError:
             return
-
-        await self.update_query(f'select * from "{view_name}"')
-        await self.action_query()
 
     async def handle_file_click(self, message: FileClick) -> None:
         """A message sent by the directory tree when a file is clicked."""
@@ -104,4 +124,4 @@ class CliDB(App):
 
 
 if __name__ == "__main__":
-    CliDB.run()  # pylint: disable=no-value-for-parameter
+    CliDB.run(title="clidb")  # pylint: disable=no-value-for-parameter

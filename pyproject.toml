@@ -2,7 +2,25 @@
 name = "clidb"
 version = "0.1.0"
 description = "CLI based SQL client for local data"
-authors = ["Danny Boland <email@dannyboland.com>"]
+authors = ["Danny Boland <danny@boland.dev>"]
+homepage = "https://github.com/dannyboland/clidb"
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Database",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"

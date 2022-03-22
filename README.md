@@ -2,7 +2,7 @@
 
 ![screenshot](./img/iris.png)
 
-clidb is a command line sql client for local data files, allowing these to be queried (even joined) and viewed. It natively supports CSV and parquet formats, with support for a others being added over time via the optional pandas dependency.
+clidb is a command line sql client for local data files, allowing these to be queried (even joined) and viewed. It natively supports CSV and parquet formats, with support for others being added over time via the optional pandas dependency.
 
 ## Data Formats
 The following file types can be opened as views in clidb:

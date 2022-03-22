@@ -4,10 +4,10 @@ import sys
 from rich.text import Text
 from textual.app import App
 from textual.views import DockView
-from textual.widgets import DirectoryTree, FileClick, ScrollView
+from textual.widgets import FileClick, ScrollView
 from textual_inputs import TextInput
 
-from clidb.database import DatabaseAdapter, DatabaseView, ViewClick
+from clidb.database import DatabaseAdapter, DatabaseView, DataFileTree, ViewClick
 
 
 class CliDB(App):
@@ -31,7 +31,7 @@ class CliDB(App):
         self.database = DatabaseAdapter()
 
     async def on_mount(self) -> None:
-        """Placeholder"""
+        """Build the clidb interface"""
         self.query_view = TextInput(
             name="query",
             placeholder="select *",
@@ -42,7 +42,7 @@ class CliDB(App):
         self.results_view = ScrollView(auto_width=True)
         self.database_view = DatabaseView("Views", data=self.database)
 
-        self.directory_view = DirectoryTree(self.dir, "DirTree")
+        self.directory_view = DataFileTree(self.dir, "DirTree")
         self.sidebar = DockView()
 
         await self.view.dock(self.query_view, edge="top", size=3)

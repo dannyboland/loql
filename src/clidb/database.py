@@ -1,32 +1,24 @@
-import importlib.util
+import asyncio
 import os
-import sys
-from os import scandir
-from typing import List
+from dataclasses import dataclass
+from multiprocessing import Process, Queue
+from typing import Any, List
 
 import duckdb
 from rich.console import ConsoleRenderable
+from rich.styled import Styled
 from rich.table import Table
 from rich.text import Text
-from textual._types import MessageTarget
-from textual.message import Message
-from textual.widgets import DirectoryTree, TreeClick, TreeControl, TreeNode
-from textual.widgets._directory_tree import DirEntry
+from textual.message_pump import MessagePump
 
-
-def lazy_import(name):
-    """Delay importing heavy libraries until we need them"""
-    spec = importlib.util.find_spec(name)
-    if not spec:
-        raise ImportError
-
-    loader = importlib.util.LazyLoader(spec.loader)
-    spec.loader = loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    loader.exec_module(module)
-    return module
-
+from clidb import lazy_import
+from clidb.events import (
+    DatabaseViewsUpdate,
+    OpenFile,
+    Query,
+    QueryResult,
+    UpdateTextInput,
+)
 
 try:
     pd = lazy_import("pandas")
@@ -34,114 +26,185 @@ try:
 except ImportError:
     _has_pd = False
 
-MAX_RESULT_LEN = 1024
-FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl"]
+try:
+    boto3 = lazy_import("boto3")
+    _has_boto = True
+except ImportError:
+    _has_boto = False
+
+MAX_RESULT_ROWS = 100
+MAX_CELL_LENGTH = 100
 
 
-class DataFileTree(DirectoryTree):
-    """A view for navigating relevant data files"""
-
-    async def load_directory(self, node: TreeNode[DirEntry]):
-        path = node.data.path
-        directory = sorted(
-            list(scandir(path)), key=lambda entry: (not entry.is_dir(), entry.name)
-        )
-        for entry in directory:
-            if entry.is_dir() or os.path.splitext(entry.path)[1] in FILETYPES:
-                await node.add(entry.name, DirEntry(entry.path, entry.is_dir()))
-        node.loaded = True
-        await node.expand()
-        self.refresh(layout=True)
+@dataclass
+class FileObj:
+    filename: str
 
 
-class DatabaseView(TreeControl):
-    """Rendered list of loaded data views"""
+class QueryError(Text):
+    """A query result that reflects an error status"""
 
-    async def add_view(self, view_name) -> None:
-        """Add a view to the list of views"""
-        if view_name not in [node.data for node in self.nodes.values()]:
-            await self.root.add(view_name, view_name)
-
-    async def refresh_views(self) -> None:
-        """Update view list with views defined in db schema"""
-        await self.root.expand()
-        for view_name in self.data.get_views():
-            await self.add_view(view_name)
-
-    async def handle_tree_click(self, message: TreeClick) -> None:
-        """Emit a ViewClick event if a view is clicked"""
-        if message.node.parent == self.root:
-            view_name = message.node.data
-            await self.emit(ViewClick(self, view_name))
+    def __init__(self, error: str) -> None:
+        super().__init__(error, justify="center")
 
 
-class ViewClick(Message):
-    """View click event containing view name"""
+class DatabaseProcess(Process):
+    """Separate process as thin wrapper around duckdb"""
 
-    def __init__(self, sender: MessageTarget, view_name: str) -> None:
-        self.view_name = view_name
-        super().__init__(sender)
+    end_queue_sentinel = object()
 
+    def __init__(self, read_clipboard=False):
+        super().__init__()
+        self.query_queue = Queue()
+        self.result_queue = Queue()
+        self.read_clipboard = read_clipboard
 
-class DatabaseAdapter:
-    """Thin wrapper around duckdb"""
-
-    def __init__(self) -> None:
+    def run(self) -> None:
         self.con = duckdb.connect(database=":memory:")
         self.con.view("duckdb_views").create_view("schemas")
 
-    def get_views(self) -> List[str]:
+        if self.read_clipboard and _has_pd:
+            self.__load_clipboard_as_view()
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.__await_query())
+
+    async def __await_query(self):
+        while True:
+            result = None
+            query_obj = self.query_queue.get()
+            if query_obj == self.end_queue_sentinel:
+                break
+            elif query_obj is None:
+                result = ""
+            elif isinstance(query_obj, str):
+                result = self.__query(query_obj)
+            elif isinstance(query_obj, FileObj):
+                try:
+                    result = self.__load_file_as_view(query_obj.filename)
+                except (FileNotFoundError, ValueError, RuntimeError):
+                    result = QueryError(f"Failed to load {query_obj.filename}.")
+                except ImportError:
+                    result = QueryError("Please install clidb[extras].")
+
+            views = self.__get_views()
+            self.result_queue.put((result, views))
+
+    def __get_views(self) -> List[str]:
         """Returns a list of defined view names"""
         return [schema[2] for schema in self.con.view("schemas").fetchall()]
 
-    def load_file_as_view(self, filename: str) -> str:
+    def __load_file_as_view(self, filename: str) -> str:
         """Creates a view for a data file and returns the view's name"""
-        file_path, file_extension = os.path.splitext(filename)
+        file_path, file_type = os.path.splitext(filename)
         view_name = os.path.basename(file_path)
 
-        if file_extension == ".csv":
-            self.con.from_csv_auto(filename).create_view(view_name)
-        elif file_extension == ".parquet":
-            self.con.from_parquet(filename).create_view(view_name)
-        elif file_extension == ".gz" and view_name.endswith(".parquet"):
+        if file_type == ".gz" and view_name.endswith(".parquet"):
+            file_type = ".parquet"
             view_name = view_name[: -len(".parquet")]
+
+        if filename.startswith("s3://") and file_type == ".parquet":
+            if _has_pd and _has_boto:
+                self.con.register(view_name, pd.read_parquet(filename))
+            else:
+                raise ImportError
+        elif file_type == ".csv":
+            self.con.from_csv_auto(filename).create_view(view_name)
+        elif file_type == ".parquet":
             self.con.from_parquet(filename).create_view(view_name)
-        elif file_extension == ".json":
+        elif file_type == ".json":
             if _has_pd:
                 self.con.register(view_name, pd.read_json(filename))
             else:
-                raise ImportError("pandas")
-        elif file_extension == ".jsonl":
+                raise ImportError
+        elif file_type == ".jsonl":
             if _has_pd:
                 self.con.register(view_name, pd.read_json(filename, lines=True))
             else:
-                raise ImportError("pandas")
+                raise ImportError
         else:
             raise ValueError
 
         return view_name
 
-    def load_clipboard_as_view(self) -> None:
+    def __load_clipboard_as_view(self) -> None:
         """Creates a view of data from the clipboard"""
-        if not _has_pd:
-            raise ImportError("pandas")
+        view_name = "clipboard"
+        if _has_pd:
+            self.con.register(view_name, pd.read_clipboard())
+        else:
+            raise ImportError
 
-        self.con.register("clipboard", pd.read_clipboard())
+    @staticmethod
+    def __format_cell(value: Any) -> str:
+        return str(value)[:MAX_CELL_LENGTH]
 
-    def query(self, query_str: str) -> ConsoleRenderable:
+    def __query(self, query_str: str) -> ConsoleRenderable:
         """Returns the result of a query as a text table"""
-        table = Table(header_style="green", expand=True, highlight=True)
 
         try:
             result_relation = self.con.query(query_str)
 
             if result_relation is not None:
-                lim_results = result_relation.limit(MAX_RESULT_LEN)
-                for col in lim_results.columns:
-                    table.add_column(col, style="magenta")
-                for row in lim_results.fetchall():
-                    table.add_row(*map(str, row))
+                lim_results = result_relation.limit(MAX_RESULT_ROWS)
 
-                return table
+                columns = lim_results.columns
+                rows = lim_results.fetchall()
+
+                table = Table(
+                    header_style="green",
+                    expand=True,
+                    highlight=True,
+                    show_lines=True,
+                )
+
+                for col in columns:
+                    table.add_column(col, style="magenta")
+
+                for row in rows:
+                    table.add_row(*map(self.__format_cell, row))
+
+                return Styled(table, "")
         except (AttributeError, RuntimeError) as query_error:
-            return Text(str(query_error), justify="center")
+            err_msg = QueryError(str(query_error))
+            return err_msg
+
+
+class DatabaseController(MessagePump):
+    def __init__(self, name=None, load_clipboard=False):
+        class_name = self.__class__.__name__
+        self.name = name or f"{class_name}"
+        super().__init__()
+        self.database = DatabaseProcess(load_clipboard)
+        self.database.daemon = True
+        self.database.start()
+
+        if load_clipboard:
+            self.post_message_no_wait(Query(self, "select * from clipboard"))
+
+    async def handle_query(self, message: Query) -> None:
+        self.log(message.query)
+        self.database.query_queue.put(message.query)
+        loop = asyncio.get_event_loop()
+        result, views = await loop.run_in_executor(None, self.database.result_queue.get)
+        await self.emit(DatabaseViewsUpdate(self, views))
+        await self.emit(QueryResult(self, result))
+
+    async def handle_open_file(self, message: OpenFile) -> None:
+        self.database.query_queue.put(FileObj(message.filename))
+
+        loop = asyncio.get_event_loop()
+        load_response, views = await loop.run_in_executor(
+            None, self.database.result_queue.get
+        )
+
+        if isinstance(load_response, QueryError):
+            await self.emit(QueryResult(self, load_response))
+        else:
+            view_name = load_response
+            query = f'select * from "{view_name}"'
+            await self.emit(UpdateTextInput(self, query))
+            await self.post_message(Query(self, query))
+
+        if views:
+            await self.emit(DatabaseViewsUpdate(self, views))

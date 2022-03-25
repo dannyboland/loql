@@ -6,9 +6,17 @@ from rich.text import Text
 from textual.app import App
 from textual.views import DockView
 from textual.widgets import FileClick, ScrollView
-from textual_inputs import TextInput
 
-from clidb.database import DatabaseAdapter, DatabaseView, DataFileTree, ViewClick
+from clidb.database import DatabaseController
+from clidb.events import (
+    DatabaseViewsUpdate,
+    OpenFile,
+    Query,
+    QueryResult,
+    UpdateTextInput,
+    ViewClick,
+)
+from clidb.views import DatabaseView, DataFileTree, QueryInput, ResultsView
 
 logger = getLogger()
 
@@ -36,37 +44,29 @@ class CliDB(App):
 
         self.path = args.path
 
-        self.database = DatabaseAdapter()
-
-        if args.clipboard:
-            try:
-                self.database.load_clipboard_as_view()
-            except ImportError as import_error:
-                logger.error(
-                    f"Please install clidb[{import_error.msg}] for clipboard loading."
-                )
-                exit(1)
+        self.database = DatabaseController(load_clipboard=args.clipboard)
+        self.register(self.database, self)
 
     async def on_mount(self) -> None:
         """Build the clidb interface"""
-        self.query_view = TextInput(
-            name="query",
+        self.query_view = QueryInput(
+            name="QueryView",
             placeholder="select *",
             title="SQL Query",
             syntax="sql",
         )
 
-        self.results_view = ScrollView(auto_width=True)
-        self.database_view = DatabaseView("Views", data=self.database)
+        self.results_view = ResultsView(auto_width=True, name="ResultsView")
+        self.database_view = DatabaseView("Views", name="DatabaseView")
 
-        if os.path.isdir(self.path):
+        if os.path.isdir(self.path) or self.path.startswith("s3://"):
             view_dir = self.path
         else:
             view_dir = os.path.dirname(self.path) or os.getcwd()
-            await self.call_later(self.read_file, self.path)
+            await self.database.post_message(OpenFile(self, self.path))
 
-        self.directory_view = DataFileTree(view_dir, "DirTree")
-        self.sidebar = DockView()
+        self.directory_view = DataFileTree(str(view_dir), "DirTree")
+        self.sidebar = DockView(name="Sidebar")
 
         await self.view.dock(self.query_view, edge="top", size=3)
         await self.view.dock(
@@ -78,7 +78,10 @@ class CliDB(App):
         await self.sidebar.dock(
             ScrollView(self.directory_view), ScrollView(self.database_view), edge="top"
         )
-        await self.database_view.refresh_views()
+
+        # TODO: fetch the initial list properly
+        await self.database_view.root.add("schemas", "schemas")
+        await self.database_view.root.expand()
 
         self.database_view.style = "green"
 
@@ -86,42 +89,34 @@ class CliDB(App):
 
     async def handle_view_click(self, message: ViewClick) -> None:
         """Catch view clicks from the Database view and run query on view"""
-        await self.update_query(f'select * from "{message.view_name}"')
-        await self.action_query()
+        query = f'select * from "{message.view_name}"'
+        await self.query_view.post_message(UpdateTextInput(self, query))
+        await self.database.post_message(Query(self, query))
 
-    async def update_query(self, query_text: str) -> None:
-        """Hacky override of TextInput value as not directly supported yet"""
-        self.query_view.value = query_text
-        await self.query_view.emit(
-            self.query_view._on_change_message_class(self.query_view)
-        )
+    async def handle_update_text_input(self, message: UpdateTextInput) -> None:
+        """Catch a request to update the query input and pass to the input"""
+        await self.query_view.post_message(message)
+
+    async def handle_query_result(self, message: QueryResult) -> None:
+        """Handle a result table from a query"""
+        await self.results_view.post_message(message)
+
+    async def handle_database_views_update(self, message: DatabaseViewsUpdate) -> None:
+        await self.database_view.post_message(message)
 
     async def action_query(self) -> None:
-        """Render a file or query result's contents"""
-        result = self.database.query(self.query_view.value)
-        await self.database_view.refresh_views()
-
-        if result:
-            await self.results_view.update(result)
-
-    async def read_file(self, filename: str) -> None:
-        """Render a data file's contents"""
-        try:
-            view_name = self.database.load_file_as_view(filename)
-            await self.update_query(f'select * from "{view_name}"')
-            await self.action_query()
-        except ImportError as import_error:
-            await self.results_view.update(
-                Text(f"Please install clidb[{import_error.msg}]", justify="center")
-            )
-        except ValueError:
-            return
+        """Submit a query and render result's contents"""
+        await self.database.post_message(Query(self, self.query_view.value))
 
     async def handle_file_click(self, message: FileClick) -> None:
-        """A message sent by the directory tree when a file is clicked."""
-
-        await self.read_file(message.path)
+        await self.results_view.post_message(
+            QueryResult(self, Text("Loading...", justify="center"))
+        )
+        self.log("Opening", message.path)
+        await self.database.post_message(OpenFile(self, message.path))
 
 
 if __name__ == "__main__":
-    CliDB.run(title="clidb")  # pylint: disable=no-value-for-parameter
+    CliDB.run(
+        title="clidb", log="textual.log"
+    )  # pylint: disable=no-value-for-parameter

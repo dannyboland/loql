@@ -20,7 +20,7 @@ except ImportError:
 class DataFileTree(DirectoryTree):
     """A DirectoryTree that filters supported filetypes and also handles S3"""
 
-    LOCAL_FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl"]
+    LOCAL_FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl", ".xls", ".xlsx"]
     S3_FILETYPES = [".parquet", ".gz"]
     """A view for navigating relevant data files"""
 

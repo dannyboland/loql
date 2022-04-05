@@ -122,6 +122,11 @@ class DatabaseProcess(Process):
                 self.con.register(view_name, pd.read_json(filename, lines=True))
             else:
                 raise ImportError
+        elif file_type in (".xls", ".xlsx"):
+            if _has_pd:
+                self.con.register(view_name, pd.read_excel(filename))
+            else:
+                raise ImportError
         else:
             raise ValueError
 

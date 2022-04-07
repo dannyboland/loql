@@ -106,7 +106,8 @@ class ResultsView(ScrollView):
 
     async def handle_query_result(self, message: QueryResult):
         """Render a query result in response to a QueryResult event"""
-        await self.update(message.result)
+        if message.result:
+            await self.update(message.result)
 
 
 class DatabaseView(TreeControl):

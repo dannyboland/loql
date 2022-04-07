@@ -53,11 +53,12 @@ class DatabaseProcess(Process):
 
     end_queue_sentinel = object()
 
-    def __init__(self, read_clipboard=False):
+    def __init__(self, read_clipboard=False, row_lines=False):
         super().__init__()
         self.query_queue = Queue()
         self.result_queue = Queue()
         self.read_clipboard = read_clipboard
+        self.row_lines = row_lines
 
     def run(self) -> None:
         self.con = duckdb.connect(database=":memory:")
@@ -160,7 +161,7 @@ class DatabaseProcess(Process):
                     header_style="green",
                     expand=True,
                     highlight=True,
-                    show_lines=True,
+                    show_lines=self.row_lines,
                 )
 
                 for col in columns:
@@ -176,11 +177,11 @@ class DatabaseProcess(Process):
 
 
 class DatabaseController(MessagePump):
-    def __init__(self, name=None, load_clipboard=False):
+    def __init__(self, name=None, load_clipboard=False, row_lines=False):
         class_name = self.__class__.__name__
         self.name = name or f"{class_name}"
         super().__init__()
-        self.database = DatabaseProcess(load_clipboard)
+        self.database = DatabaseProcess(load_clipboard, row_lines)
         self.database.daemon = True
         self.database.start()
 

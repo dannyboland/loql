@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Union
 
 from rich.console import ConsoleRenderable
+from rich.text import Text
 from textual._types import MessageTarget
 from textual.message import Message
 
@@ -13,7 +14,7 @@ class ViewClick(Message):
         super().__init__(sender)
 
 
-class UpdateTextInput(Message, bubble=False):  # type: ignore
+class UpdateTextInput(Message, bubble=False):
     """Update TextInput value event"""
 
     def __init__(self, sender: MessageTarget, text: str) -> None:
@@ -29,15 +30,21 @@ class Query(Message):
         super().__init__(sender)
 
 
-class QueryResult(Message, bubble=False):  # type: ignore
+class QueryResult(Message, bubble=False):
     """Query result event containing results table"""
 
-    def __init__(self, sender: MessageTarget, result: ConsoleRenderable) -> None:
-        self.result = result
+    def __init__(
+        self, sender: MessageTarget, result: Union[ConsoleRenderable, str]
+    ) -> None:
+        self.result: ConsoleRenderable
+        if isinstance(result, str):
+            self.result = Text(result, justify="center")
+        else:
+            self.result = result
         super().__init__(sender)
 
 
-class DatabaseViewsUpdate(Message, bubble=False):  # type: ignore
+class DatabaseViewsUpdate(Message, bubble=False):
     """Views updated event following a database action"""
 
     def __init__(self, sender: MessageTarget, views: List[str]) -> None:

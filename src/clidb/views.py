@@ -35,7 +35,7 @@ class DataFileTree(DirectoryTree):
         # No matching children
         return None
 
-    async def load_local_directory(self, node: TreeNode[DirEntry]):
+    async def load_local_directory(self, node: TreeNode[DirEntry]) -> None:
         """Add entries for contents of a local directory"""
         path = node.data.path
 
@@ -50,7 +50,7 @@ class DataFileTree(DirectoryTree):
                 await node.add(entry.name, DirEntry(entry.path, entry.is_dir()))
         node.loaded = True
 
-    async def preload_s3_directory(self, node: TreeNode[DirEntry]):
+    async def preload_s3_directory(self, node: TreeNode[DirEntry]) -> None:
         """Pre-populate all entries for contents of an s3 path"""
         if not _has_boto:
             raise ImportError("boto3")
@@ -67,19 +67,22 @@ class DataFileTree(DirectoryTree):
             filename = path_parts[-1]
 
             current_node = node
+
             for s3_dir in path_dirs:
                 new_path = current_node.data.path + s3_dir + "/"
                 if not await self.get_child_node_with_path(current_node, new_path):
                     await current_node.add(s3_dir, DirEntry(new_path, True))
-                current_node = await self.get_child_node_with_path(
-                    current_node, new_path
-                )
+                next_node = await self.get_child_node_with_path(current_node, new_path)
+                if not next_node:
+                    break
+
+                current_node = next_node
                 current_node.loaded = True
             if os.path.splitext(filename)[1] in self.S3_FILETYPES:
                 new_path = current_node.data.path + filename
                 await current_node.add(filename, DirEntry(new_path, False))
 
-    async def load_directory(self, node: TreeNode[DirEntry]):
+    async def load_directory(self, node: TreeNode[DirEntry]) -> None:
         if node.data.path.startswith("s3://") and not node.loaded:
             if _has_boto:
                 await self.preload_s3_directory(self.root)
@@ -95,7 +98,7 @@ class DataFileTree(DirectoryTree):
 class QueryInput(TextInput):
     """A TextInput that handles UpdateTextInput events"""
 
-    async def handle_update_text_input(self, message: UpdateTextInput):
+    async def handle_update_text_input(self, message: UpdateTextInput) -> None:
         """Handle a request to update the text input value"""
         self.value = message.text
         await self.emit(self._on_change_message_class(self))
@@ -104,16 +107,16 @@ class QueryInput(TextInput):
 class ResultsView(ScrollView):
     """A ScrollView that handles QueryResult events"""
 
-    async def handle_query_result(self, message: QueryResult):
+    async def handle_query_result(self, message: QueryResult) -> None:
         """Render a query result in response to a QueryResult event"""
         if message.result:
             await self.update(message.result)
 
 
-class DatabaseView(TreeControl):
+class DatabaseView(TreeControl[str]):
     """Rendered list of loaded data views"""
 
-    def __init__(self, label, name=None, data="root"):
+    def __init__(self, label: str, name: Optional[str] = None, data: str = "root"):
         super().__init__(label=label, data=data, name=name)
 
     async def handle_database_views_update(self, message: DatabaseViewsUpdate) -> None:
@@ -130,7 +133,7 @@ class DatabaseView(TreeControl):
             await self.root.add(view, view)
             self._update_size(self.size + (0, 1))
 
-    async def handle_tree_click(self, message: TreeClick) -> None:
+    async def handle_tree_click(self, message: TreeClick[str]) -> None:
         """Emit a ViewClick event if a view is clicked"""
         if message.node.parent == self.root:
             view_name = message.node.data

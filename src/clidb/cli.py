@@ -40,11 +40,16 @@ class CliDB(App):
             action="store_true",
             help="Display clipboard contents as view.",
         )
+        parser.add_argument(
+            "--row-lines", action="store_true", help="Render row separator lines."
+        )
         args = parser.parse_args()
 
         self.path = args.path
 
-        self.database = DatabaseController(load_clipboard=args.clipboard)
+        self.database = DatabaseController(
+            load_clipboard=args.clipboard, row_lines=args.row_lines
+        )
         self.register(self.database, self)
 
     async def on_mount(self) -> None:

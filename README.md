@@ -44,6 +44,11 @@ For example:
 clidb data/iris.csv
 ```
 
+For some data sources, it can be useful to render lines to separate rows. This can be enabled via the `row-lines` option:
+```bash
+clidb --row-lines
+```
+
 ## Advanced Usage
 New views can be created from an opened file. For example if `iris.csv` was opened as the view `iris`, then we could create a new view:
 ```sql

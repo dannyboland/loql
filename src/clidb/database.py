@@ -2,7 +2,7 @@ import asyncio
 import os
 from dataclasses import dataclass
 from multiprocessing import Process, Queue
-from typing import Any, List
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import duckdb
 from rich.console import ConsoleRenderable
@@ -35,6 +35,12 @@ except ImportError:
 MAX_RESULT_ROWS = 100
 MAX_CELL_LENGTH = 100
 
+if TYPE_CHECKING:
+    from multiprocessing import _QueueType
+
+    # Our results queue is always a tuple of a renderable result and a list of views
+    ResultQueueType = _QueueType[Tuple[Union[ConsoleRenderable, str, None], List[str]]]
+
 
 @dataclass
 class FileObj:
@@ -53,10 +59,11 @@ class DatabaseProcess(Process):
 
     end_queue_sentinel = object()
 
-    def __init__(self, read_clipboard=False, row_lines=False):
+    def __init__(self, read_clipboard: bool = False, row_lines: bool = False) -> None:
         super().__init__()
-        self.query_queue = Queue()
-        self.result_queue = Queue()
+        self.query_queue: "Queue[Any]" = Queue()
+
+        self.result_queue: ResultQueueType = Queue()
         self.read_clipboard = read_clipboard
         self.row_lines = row_lines
 
@@ -70,9 +77,9 @@ class DatabaseProcess(Process):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.__await_query())
 
-    async def __await_query(self):
+    async def __await_query(self) -> None:
         while True:
-            result = None
+            result: Optional[Union[ConsoleRenderable, str]] = None
             query_obj = self.query_queue.get()
             if query_obj == self.end_queue_sentinel:
                 break
@@ -93,7 +100,9 @@ class DatabaseProcess(Process):
 
     def __get_views(self) -> List[str]:
         """Returns a list of defined view names"""
-        return [schema[2] for schema in self.con.view("schemas").fetchall()]
+        return [
+            schema[2] for schema in self.con.view("schemas").fetchall()  # type: ignore
+        ]
 
     def __load_file_as_view(self, filename: str) -> str:
         """Creates a view for a data file and returns the view's name"""
@@ -167,7 +176,7 @@ class DatabaseProcess(Process):
                 for col in columns:
                     table.add_column(col, style="magenta")
 
-                for row in rows:
+                for row in rows:  # type: ignore
                     table.add_row(*map(self.__format_cell, row))
 
                 return Styled(table, "")
@@ -177,7 +186,12 @@ class DatabaseProcess(Process):
 
 
 class DatabaseController(MessagePump):
-    def __init__(self, name=None, load_clipboard=False, row_lines=False):
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        load_clipboard: bool = False,
+        row_lines: bool = False,
+    ):
         class_name = self.__class__.__name__
         self.name = name or f"{class_name}"
         super().__init__()

@@ -1,15 +1,18 @@
 import importlib.util
 import sys
+from importlib.abc import Loader
+from types import ModuleType
 
 
-def lazy_import(name):
+def lazy_import(name: str) -> ModuleType:
     """Delay importing heavy libraries until we need them"""
     spec = importlib.util.find_spec(name)
-    if not spec:
+    if not spec or not spec.loader:
         raise ImportError
 
+    assert isinstance(spec.loader, Loader)
     loader = importlib.util.LazyLoader(spec.loader)
-    spec.loader = loader
+
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     loader.exec_module(module)

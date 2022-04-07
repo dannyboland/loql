@@ -194,7 +194,8 @@ class DatabaseController(MessagePump):
         loop = asyncio.get_event_loop()
         result, views = await loop.run_in_executor(None, self.database.result_queue.get)
         await self.emit(DatabaseViewsUpdate(self, views))
-        await self.emit(QueryResult(self, result))
+        if result:
+            await self.emit(QueryResult(self, result))
 
     async def handle_open_file(self, message: OpenFile) -> None:
         self.database.query_queue.put(FileObj(message.filename))

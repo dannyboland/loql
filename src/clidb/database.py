@@ -1,4 +1,5 @@
 import asyncio
+import multiprocessing as mp
 import os
 from dataclasses import dataclass
 from multiprocessing import Process, Queue
@@ -195,6 +196,7 @@ class DatabaseController(MessagePump):
         class_name = self.__class__.__name__
         self.name = name or f"{class_name}"
         super().__init__()
+        mp.set_start_method("spawn")
         self.database = DatabaseProcess(load_clipboard, row_lines)
         self.database.daemon = True
         self.database.start()

@@ -1,3 +1,5 @@
+"""Event definitions for passing between MessagePumps in the textual framework"""
+
 from typing import List, Union
 
 from rich.console import ConsoleRenderable

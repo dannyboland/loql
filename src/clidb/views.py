@@ -1,3 +1,5 @@
+"""The UI elements in the textual framework"""
+
 import os
 from typing import Optional
 from urllib.parse import urlparse
@@ -10,11 +12,7 @@ from clidb import lazy_import
 from clidb.database import QueryError
 from clidb.events import DatabaseViewsUpdate, QueryResult, UpdateTextInput, ViewClick
 
-try:
-    boto3 = lazy_import("boto3")
-    _has_boto = True
-except ImportError:
-    _has_boto = False
+boto3 = lazy_import("boto3")
 
 
 class DataFileTree(DirectoryTree):
@@ -22,7 +20,6 @@ class DataFileTree(DirectoryTree):
 
     LOCAL_FILETYPES = [".csv", ".parquet", ".gz", ".json", ".jsonl", ".xls", ".xlsx"]
     S3_FILETYPES = [".parquet", ".gz"]
-    """A view for navigating relevant data files"""
 
     @staticmethod
     async def get_child_node_with_path(
@@ -52,14 +49,14 @@ class DataFileTree(DirectoryTree):
 
     async def preload_s3_directory(self, node: TreeNode[DirEntry]) -> None:
         """Pre-populate all entries for contents of an s3 path"""
-        if not _has_boto:
+        if boto3 is None:
             raise ImportError("boto3")
 
         s3_url = urlparse(node.data.path)
         bucket = s3_url.netloc
         key = s3_url.path.lstrip("/")
-        s3 = boto3.client("s3")
-        response = s3.list_objects_v2(Bucket=bucket, Prefix=key)
+        s3_client = boto3.client("s3")
+        response = s3_client.list_objects_v2(Bucket=bucket, Prefix=key)
 
         for path in response["Contents"]:
             path_parts = path["Key"].split("/")
@@ -84,7 +81,7 @@ class DataFileTree(DirectoryTree):
 
     async def load_directory(self, node: TreeNode[DirEntry]) -> None:
         if node.data.path.startswith("s3://") and not node.loaded:
-            if _has_boto:
+            if boto3 is not None:
                 await self.preload_s3_directory(self.root)
             else:
                 await self.app.post_message(
@@ -125,9 +122,9 @@ class DatabaseView(TreeControl[str]):
         current_views = [node.data for node in self.nodes.values()]
         new_views = set(message.views) - set(current_views)
 
-        # TODO: remove retired views for list of views
         retired_views = set(current_views) - set(message.views)
         retired_views.remove(self.data)
+        # TODO: remove retired views from list of views
 
         for view in new_views:
             await self.root.add(view, view)

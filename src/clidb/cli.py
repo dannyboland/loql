@@ -1,3 +1,5 @@
+"""Entrypoint for clidb, constructs the app and run its"""
+
 import argparse
 import os
 import platform
@@ -65,10 +67,19 @@ class CliDB(App):
         clipboard: flag to enable creating a view of clipboard contents
         row_lines: flag to print lines between rows
         """
-        self.clipboard = kwargs.pop("clipboard")
-        self.row_lines = kwargs.pop("row_lines")
-        self.path = kwargs.pop("path")
+        self.config = {}
+        for config_option in ["clipboard", "row_lines", "path"]:
+            self.config[config_option] = kwargs.pop(config_option)
+
         super().__init__(title="clidb", **kwargs)
+
+        # Components to be initialised on load / mount
+        self.database: DatabaseController
+        self.query_view: QueryInput
+        self.results_view: ResultsView
+        self.database_view: DatabaseView
+        self.directory_view: DataFileTree
+        self.sidebar: DockView
 
     async def on_load(self) -> None:
         """Sent before going in to application mode."""
@@ -76,7 +87,7 @@ class CliDB(App):
         await self.bind("enter", "query", "Query")
 
         self.database = DatabaseController(
-            load_clipboard=self.clipboard, row_lines=self.row_lines
+            load_clipboard=self.config["clipboard"], row_lines=self.config["row_lines"]
         )
         self.register(self.database, self)
 
@@ -92,11 +103,12 @@ class CliDB(App):
         self.results_view = ResultsView(auto_width=True, name="ResultsView")
         self.database_view = DatabaseView("Views", name="DatabaseView")
 
-        if os.path.isdir(self.path) or self.path.startswith("s3://"):
-            view_dir = self.path
+        path = self.config["path"]
+        if os.path.isdir(path) or path.startswith("s3://"):
+            view_dir = path
         else:
-            view_dir = os.path.dirname(self.path) or os.getcwd()
-            await self.database.post_message(OpenFile(self, self.path))
+            view_dir = os.path.dirname(path) or os.getcwd()
+            await self.database.post_message(OpenFile(self, path))
 
         self.directory_view = DataFileTree(str(view_dir), "DirTree")
         self.sidebar = DockView(name="Sidebar")
@@ -112,7 +124,6 @@ class CliDB(App):
             ScrollView(self.directory_view), ScrollView(self.database_view), edge="top"
         )
 
-        # TODO: fetch the initial list properly
         await self.database_view.root.add("schemas", "schemas")
         await self.database_view.root.expand()
 
@@ -159,4 +170,4 @@ def _get_version() -> str:
 
 
 if __name__ == "__main__":
-    run(["--log", "textual.log"])
+    run()

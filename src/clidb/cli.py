@@ -69,7 +69,7 @@ class CliDB(App):
         """
         self.config = {}
         for config_option in ["clipboard", "row_lines", "path"]:
-            self.config[config_option] = kwargs.pop(config_option)
+            self.config[config_option] = kwargs.get(config_option, False)
 
         super().__init__(title="clidb", **kwargs)
 

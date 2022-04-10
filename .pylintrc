@@ -1,0 +1,5 @@
+[MASTER]
+extension-pkg-allow-list=duckdb
+
+[SIMILARITIES]
+ignore-imports=yes

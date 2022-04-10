@@ -2,7 +2,10 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.2.0
     hooks:
+      - id: trailing-whitespace
       - id: end-of-file-fixer
+      - id: check-added-large-files
+      - id: check-yaml
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
 
@@ -22,6 +25,8 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: ["textual", "duckdb"]
+        exclude: tests/
+
 
   - repo: https://github.com/psf/black
     rev: 22.3.0

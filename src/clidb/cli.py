@@ -1,12 +1,14 @@
 import argparse
 import os
-from logging import getLogger
+import platform
+from typing import Any, List, Optional
 
 from rich.text import Text
 from textual.app import App
 from textual.views import DockView
 from textual.widgets import FileClick, ScrollView
 
+from clidb import __version__
 from clidb.database import DatabaseController
 from clidb.events import (
     DatabaseViewsUpdate,
@@ -18,37 +20,63 @@ from clidb.events import (
 )
 from clidb.views import DatabaseView, DataFileTree, QueryInput, ResultsView
 
-logger = getLogger()
+
+def run(argv: Optional[List[str]] = None) -> None:
+    """Entrypoint for clidb, parses arguments and initiates the app"""
+    parser = argparse.ArgumentParser(description="cli sql client for local data files.")
+    parser.add_argument(
+        "path", nargs="?", default=os.getcwd(), help="path to display", type=str
+    )
+    parser.add_argument(
+        "--clipboard",
+        action="store_true",
+        help="Display clipboard contents as view.",
+    )
+    parser.add_argument(
+        "--row-lines", action="store_true", help="Render row separator lines."
+    )
+
+    parser.add_argument(
+        "--version",
+        "-v",
+        action="version",
+        version=_get_version(),
+        help="Display version information.",
+    )
+
+    parser.add_argument(
+        "--log",
+        "-l",
+        type=str,
+        default=None,
+        help="Log file for debug messages.",
+    )
+
+    args = parser.parse_args(argv)
+    CliDB.run(**vars(args))
 
 
 class CliDB(App):
     """CLI interface for a local db sql client"""
+
+    def __init__(self, **kwargs: Any) -> None:
+        """
+        log: log file to write debug messages to
+        clipboard: flag to enable creating a view of clipboard contents
+        row_lines: flag to print lines between rows
+        """
+        self.clipboard = kwargs.pop("clipboard")
+        self.row_lines = kwargs.pop("row_lines")
+        self.path = kwargs.pop("path")
+        super().__init__(title="clidb", **kwargs)
 
     async def on_load(self) -> None:
         """Sent before going in to application mode."""
         await self.bind("q", "quit", "Quit")
         await self.bind("enter", "query", "Query")
 
-        parser = argparse.ArgumentParser(
-            description="cli sql client for local data files."
-        )
-        parser.add_argument(
-            "path", nargs="?", default=os.getcwd(), help="path to display", type=str
-        )
-        parser.add_argument(
-            "--clipboard",
-            action="store_true",
-            help="Display clipboard contents as view.",
-        )
-        parser.add_argument(
-            "--row-lines", action="store_true", help="Render row separator lines."
-        )
-        args = parser.parse_args()
-
-        self.path = args.path
-
         self.database = DatabaseController(
-            load_clipboard=args.clipboard, row_lines=args.row_lines
+            load_clipboard=self.clipboard, row_lines=self.row_lines
         )
         self.register(self.database, self)
 
@@ -107,6 +135,7 @@ class CliDB(App):
         await self.results_view.post_message(message)
 
     async def handle_database_views_update(self, message: DatabaseViewsUpdate) -> None:
+        """Handle an updated list of views"""
         await self.database_view.post_message(message)
 
     async def action_query(self) -> None:
@@ -114,6 +143,7 @@ class CliDB(App):
         await self.database.post_message(Query(self, self.query_view.value))
 
     async def handle_file_click(self, message: FileClick) -> None:
+        """Handle a file click event, rendering a loading message pending a reesult"""
         await self.results_view.post_message(
             QueryResult(self, Text("Loading...", justify="center"))
         )
@@ -121,7 +151,12 @@ class CliDB(App):
         await self.database.post_message(OpenFile(self, message.path))
 
 
+def _get_version() -> str:
+    return f"""
+    clidb {__version__} [Python {platform.python_version()}]
+    Copyright 2022 Danny Boland
+    """
+
+
 if __name__ == "__main__":
-    CliDB.run(
-        title="clidb", log="textual.log"
-    )  # pylint: disable=no-value-for-parameter
+    run(["--log", "textual.log"])

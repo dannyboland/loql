@@ -1,7 +1,10 @@
 import importlib.util
 import sys
+from importlib import metadata
 from importlib.abc import Loader
 from types import ModuleType
+
+__version__ = metadata.version(__name__)
 
 
 def lazy_import(name: str) -> ModuleType:

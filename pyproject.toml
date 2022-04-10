@@ -49,4 +49,4 @@ build-backend = "poetry.core.masonry.api"
 extras = ["pandas","pyarrow","fsspec","s3fs","boto3","xlrd","openpyxl"]
 
 [tool.poetry.scripts]
-clidb = "clidb.cli:CliDB.run"
+clidb = "clidb.cli:run"

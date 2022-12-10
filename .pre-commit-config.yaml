@@ -24,7 +24,7 @@ repos:
     rev: v0.942
     hooks:
       - id: mypy
-        additional_dependencies: ["textual", "duckdb"]
+        additional_dependencies: ["textual==0.1.18", "duckdb"]
         exclude: tests/
 
 

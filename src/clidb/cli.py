@@ -70,6 +70,8 @@ class CliDB(App):
         self.config = {}
         for config_option in ["clipboard", "row_lines", "path"]:
             self.config[config_option] = kwargs.get(config_option, False)
+            # Remove our config from kwargs and pass rest to Textual parent class
+            del kwargs[config_option]
 
         super().__init__(title="clidb", **kwargs)
 

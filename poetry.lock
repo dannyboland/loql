@@ -1142,6 +1142,17 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "poetry-core"
+version = "1.7.0"
+description = "Poetry PEP 517 Build Backend"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "poetry_core-1.7.0-py3-none-any.whl", hash = "sha256:38e174cdb00a84ee4a1cab66a378b435747f72414f5573bc18cfc3850a94df38"},
+    {file = "poetry_core-1.7.0.tar.gz", hash = "sha256:8f679b83bd9c820082637beca1204124d5d2a786e4818da47ec8acefd0353b74"},
+]
+
+[[package]]
 name = "pre-commit"
 version = "2.21.0"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
@@ -1556,6 +1567,24 @@ docs = ["pygments-github-lexers (>=0.0.5)", "sphinx (>=2.0.0)", "sphinxcontrib-a
 testing = ["flaky (>=3.4.0)", "freezegun (>=0.3.11)", "pathlib2 (>=2.3.3)", "psutil (>=5.6.1)", "pytest (>=4.0.0)", "pytest-cov (>=2.5.1)", "pytest-mock (>=1.10.0)", "pytest-randomly (>=1.0.0)"]
 
 [[package]]
+name = "tox-poetry-installer"
+version = "0.10.3"
+description = "A plugin for Tox that lets you install test environment dependencies from the Poetry lockfile"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "tox_poetry_installer-0.10.3-py3-none-any.whl", hash = "sha256:8580caf05f1ac83a7a938e449cfcb220cadaf6b087e9581ae837d782804ad4bc"},
+    {file = "tox_poetry_installer-0.10.3.tar.gz", hash = "sha256:58af36082293b87e3488184f46ccf6f288c52c90e802066f53d3209c0f1c6226"},
+]
+
+[package.dependencies]
+poetry-core = ">=1.1.0,<2.0.0"
+tox = ">=3.8.0,<4.0.0"
+
+[package.extras]
+poetry = ["cleo (>=1.0,<3.0)", "poetry (>=1.2.0,<1.5.0)"]
+
+[[package]]
 name = "typing-extensions"
 version = "4.8.0"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1795,4 +1824,4 @@ extras = ["boto3", "fsspec", "openpyxl", "pandas", "pyarrow", "s3fs", "xlrd"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "6aea5a6818e2bdf30b8ca42294ff8f1cab0db3dba1000ecffc83dc443d1306df"
+content-hash = "7cdc062ca529b9c9df14be96b884b969199c4c92e10480e131ba719f6ae85ff8"

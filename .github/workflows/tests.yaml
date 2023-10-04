@@ -25,7 +25,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'poetry'
-    - name: Install tox with poetry locked deps
-      run: poetry run pip install "tox-poetry-installer[poetry]"
+    - name: Install CI dependencies
+      run: poetry install
     - name: Use tox to run CI checks
       run: poetry run tox

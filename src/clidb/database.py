@@ -101,9 +101,7 @@ class DatabaseProcess(Process):
 
     def __get_views(self) -> List[str]:
         """Returns a list of defined view names"""
-        return [
-            schema[2] for schema in self.con.view("schemas").fetchall()  # type: ignore
-        ]
+        return [schema[2] for schema in self.con.view("schemas").fetchall()]
 
     def __load_file_with_pandas(
         self, filename: str, file_type: str, view_name: str
@@ -172,7 +170,7 @@ class DatabaseProcess(Process):
                 for col in columns:
                     table.add_column(col, style="magenta")
 
-                for row in rows:  # type: ignore
+                for row in rows:
                     table.add_row(*map(self.__format_cell, row))
 
                 return Styled(table, "")

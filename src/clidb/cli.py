@@ -3,24 +3,11 @@
 import argparse
 import os
 import platform
-from typing import Any, List, Optional
+from pathlib import Path
+from typing import List, Optional
 
-from rich.text import Text
-from textual.app import App
-from textual.views import DockView
-from textual.widgets import FileClick, ScrollView
-
-from clidb import __version__
-from clidb.database import DatabaseController
-from clidb.events import (
-    DatabaseViewsUpdate,
-    OpenFile,
-    Query,
-    QueryResult,
-    UpdateTextInput,
-    ViewClick,
-)
-from clidb.views import DatabaseView, DataFileTree, QueryInput, ResultsView
+from clidb import __version__, config
+from clidb.app import Clidb
 
 
 def run(argv: Optional[List[str]] = None) -> None:
@@ -34,8 +21,12 @@ def run(argv: Optional[List[str]] = None) -> None:
         action="store_true",
         help="Display clipboard contents as view.",
     )
+
     parser.add_argument(
-        "--row-lines", action="store_true", help="Render row separator lines."
+        "--max-rows",
+        type=int,
+        default=1000,
+        help="Maximum number of rows to display.",
     )
 
     parser.add_argument(
@@ -46,128 +37,22 @@ def run(argv: Optional[List[str]] = None) -> None:
         help="Display version information.",
     )
 
-    parser.add_argument(
-        "--log",
-        "-l",
-        type=str,
-        default=None,
-        help="Log file for debug messages.",
-    )
-
     args = parser.parse_args(argv)
-    CliDB.run(**vars(args))
+    if args.path:
+        args.path = Path(args.path)
+        if not args.path.exists():
+            parser.error(f"Path {args.path} does not exist.")
 
+    config.update(vars(args))
 
-class CliDB(App):
-    """CLI interface for a local db sql client"""
-
-    def __init__(self, **kwargs: Any) -> None:
-        """
-        log: log file to write debug messages to
-        clipboard: flag to enable creating a view of clipboard contents
-        row_lines: flag to print lines between rows
-        """
-        self.config = {}
-        for config_option in ["clipboard", "row_lines", "path"]:
-            self.config[config_option] = kwargs.get(config_option, False)
-            # Remove our config from kwargs and pass rest to Textual parent class
-            del kwargs[config_option]
-
-        super().__init__(title="clidb", **kwargs)
-
-        # Components to be initialised on load / mount
-        self.database: DatabaseController
-        self.query_view: QueryInput
-        self.results_view: ResultsView
-        self.database_view: DatabaseView
-        self.directory_view: DataFileTree
-        self.sidebar: DockView
-
-    async def on_load(self) -> None:
-        """Sent before going in to application mode."""
-        await self.bind("q", "quit", "Quit")
-        await self.bind("enter", "query", "Query")
-
-        self.database = DatabaseController(
-            load_clipboard=self.config["clipboard"], row_lines=self.config["row_lines"]
-        )
-        self.register(self.database, self)
-
-    async def on_mount(self) -> None:
-        """Build the clidb interface"""
-        self.query_view = QueryInput(
-            name="QueryView",
-            placeholder="select *",
-            title="SQL Query",
-            syntax="sql",
-        )
-
-        self.results_view = ResultsView(auto_width=True, name="ResultsView")
-        self.database_view = DatabaseView("Views", name="DatabaseView")
-
-        path = self.config["path"]
-        if os.path.isdir(path) or path.startswith("s3://"):
-            view_dir = path
-        else:
-            view_dir = os.path.dirname(path) or os.getcwd()
-            await self.database.post_message(OpenFile(self, path))
-
-        self.directory_view = DataFileTree(str(view_dir), "DirTree")
-        self.sidebar = DockView(name="Sidebar")
-
-        await self.view.dock(self.query_view, edge="top", size=3)
-        await self.view.dock(
-            self.sidebar,
-            edge="left",
-            size=40,
-        )
-
-        await self.sidebar.dock(
-            ScrollView(self.directory_view), ScrollView(self.database_view), edge="top"
-        )
-
-        await self.database_view.root.add("schemas", "schemas")
-        await self.database_view.root.expand()
-
-        self.database_view.style = "green"
-
-        await self.view.dock(self.results_view, edge="top")
-
-    async def handle_view_click(self, message: ViewClick) -> None:
-        """Catch view clicks from the Database view and run query on view"""
-        query = f'select * from "{message.view_name}"'
-        await self.query_view.post_message(UpdateTextInput(self, query))
-        await self.database.post_message(Query(self, query))
-
-    async def handle_update_text_input(self, message: UpdateTextInput) -> None:
-        """Catch a request to update the query input and pass to the input"""
-        await self.query_view.post_message(message)
-
-    async def handle_query_result(self, message: QueryResult) -> None:
-        """Handle a result table from a query"""
-        await self.results_view.post_message(message)
-
-    async def handle_database_views_update(self, message: DatabaseViewsUpdate) -> None:
-        """Handle an updated list of views"""
-        await self.database_view.post_message(message)
-
-    async def action_query(self) -> None:
-        """Submit a query and render result's contents"""
-        await self.database.post_message(Query(self, self.query_view.value))
-
-    async def handle_file_click(self, message: FileClick) -> None:
-        """Handle a file click event, rendering a loading message pending a reesult"""
-        await self.results_view.post_message(
-            QueryResult(self, Text("Loading...", justify="center"))
-        )
-        self.log("Opening", message.path)
-        await self.database.post_message(OpenFile(self, message.path))
+    app = Clidb()
+    app.run()
 
 
 def _get_version() -> str:
     return f"""
     clidb {__version__} [Python {platform.python_version()}]
-    Copyright 2022 Danny Boland
+    Copyright 2024 Danny Boland
     """
 
 

@@ -10,7 +10,7 @@ repos:
         args: [--markdown-linebreak-ext=md]
 
   - repo: https://github.com/pycqa/flake8
-    rev: 3.9.2
+    rev: 7.1.0
     hooks:
       - id: flake8
 
@@ -24,7 +24,7 @@ repos:
     rev: v0.942
     hooks:
       - id: mypy
-        additional_dependencies: ["textual==0.1.18", "duckdb"]
+        additional_dependencies: ["textual", "duckdb"]
         exclude: tests/
 
 

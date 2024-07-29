@@ -1,0 +1,39 @@
+OpenFileModal {
+    align: center middle;
+    width: 120;
+    height: 120;
+}
+
+#schema,#data_sources {
+    background: $panel;
+}
+
+#file_path,#file_tree,#question {
+    width: 120;
+    height: auto;
+    max-height: 80vh;
+    max-width: 80vw;
+    border: none;
+}
+
+#file_tree,#question {
+    padding: 1 1 1 2;
+    background: $panel;
+}
+
+.data-column {
+    padding: 1 1 0 1;
+    height: 100%;
+}
+
+.nav-column {
+    width: 20%;
+    height: 100%;
+    padding: 1 1 1 1;
+    background: $panel;
+}
+
+DataTable {
+    padding: 1 1 1 1;
+    height: 80%;
+}

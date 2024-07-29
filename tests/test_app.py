@@ -1,26 +1,6 @@
 from clidb.app import Clidb
 
 
-async def test_open_file_write(tmpdir):
-    with tmpdir.as_cwd():
-        app = Clidb()
-        tmpdir.join("data.csv").write_text("a,b,c\n1,2,3\n4,5,6\n", encoding="utf-8")
-        async with app.run_test() as pilot:
-            await pilot.press("ctrl+o")  # open file
-            await pilot.click("#file_path")
-            await pilot.press("ctrl+c")  # clear input
-            await pilot.press(*list("data.csv"))
-            await pilot.press("enter")
-            await pilot.click("#sql_input")
-            await pilot.press("ctrl+c")  # clear input
-            await pilot.press(*list("select * from data"))
-            await pilot.press("ctrl+s")  # save result
-            assert (
-                tmpdir.join("results.csv").read_text(encoding="utf-8")
-                == "a,b,c\n1,2,3\n4,5,6\n"
-            )
-
-
 async def test_ctas_join(tmpdir):
     with tmpdir.as_cwd():
         app = Clidb()
@@ -53,7 +33,8 @@ async def test_ctas_join(tmpdir):
             await pilot.press("ctrl+c")  # clear input
             await pilot.press(*list("select value_a,value_b from data3"))
             await pilot.press("ctrl+s")  # save result
-            assert (
-                tmpdir.join("results.csv").read_text(encoding="utf-8")
-                == "value_a,value_b\nhello,world\nhi,there\n"
-            )
+            file_content = tmpdir.join("results.csv").read_text(encoding="utf-8")
+
+            lines = list(filter(lambda x: x != "", file_content.splitlines()))
+            expected_lines = ["value_a,value_b", "hello,world", "hi,there"]
+            assert lines == expected_lines

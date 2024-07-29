@@ -45,9 +45,7 @@ async def test_ctas_join(tmpdir):
             await pilot.press("ctrl+c")  # clear input
             await pilot.press(
                 *list(
-                    """create table data3 as (
-                    select * from data1 join data2 on data1.id = data2.id
-                )"""
+                    "create table data3 as (select * from data1 join data2 on data1.id = data2.id)"  # noqa
                 )
             )
             await pilot.press("ctrl+r")  # execute query

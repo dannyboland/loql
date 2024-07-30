@@ -1,9 +1,9 @@
 [tool.poetry]
-name = "clidb"
+name = "LoQL"
 version = "1.0.0"
-description = "CLI based SQL client for local data"
+description = "Terminal based SQL client for local data"
 authors = ["Danny Boland <danny@boland.dev>"]
-homepage = "https://github.com/dannyboland/clidb"
+homepage = "https://github.com/dannyboland/loql"
 readme = "README.md"
 license = "MIT"
 classifiers = [
@@ -50,4 +50,4 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-clidb = "clidb.cli:run"
+loql = "loql.cli:run"

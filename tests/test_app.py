@@ -1,9 +1,9 @@
-from clidb.app import Clidb
+from loql.app import LoQL
 
 
 async def test_ctas_join(tmpdir):
     with tmpdir.as_cwd():
-        app = Clidb()
+        app = LoQL()
         tmpdir.join("data1.csv").write_text(
             "id,value_a\n1,hello\n2,hi\n", encoding="utf-8"
         )

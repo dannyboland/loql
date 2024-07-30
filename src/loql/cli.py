@@ -1,17 +1,15 @@
-"""Entrypoint for clidb, constructs the app and run its"""
-
 import argparse
 import os
 import platform
 from pathlib import Path
 from typing import List, Optional
 
-from clidb import __version__, config
-from clidb.app import Clidb
+from loql import __version__, config
+from loql.app import LoQL
 
 
 def run(argv: Optional[List[str]] = None) -> None:
-    """Entrypoint for clidb, parses arguments and initiates the app"""
+    """Entrypoint for LoQL, parses arguments and initiates the app"""
     parser = argparse.ArgumentParser(description="cli sql client for local data files.")
     parser.add_argument(
         "path", nargs="?", default=os.getcwd(), help="path to display", type=str
@@ -45,13 +43,13 @@ def run(argv: Optional[List[str]] = None) -> None:
 
     config.update(vars(args))
 
-    app = Clidb()
+    app = LoQL()
     app.run()
 
 
 def _get_version() -> str:
     return f"""
-    clidb {__version__} [Python {platform.python_version()}]
+    LoQL {__version__} [Python {platform.python_version()}]
     Copyright 2024 Danny Boland
     """
 

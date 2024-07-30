@@ -1,4 +1,4 @@
-"""clidb is a command line sql client for individual data files."""
+"""LoQL is a terminal based sql client for local data files."""
 
 import importlib.util
 import sys

@@ -7,7 +7,7 @@ from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Input, Label
 
-from clidb import config
+from loql import config
 
 
 class DataFileTree(DirectoryTree):

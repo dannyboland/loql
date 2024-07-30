@@ -11,8 +11,8 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Footer, TextArea, Tree
 
-from clidb import config, lazy_import
-from clidb.views import OpenFileModal
+from loql import config, lazy_import
+from loql.views import OpenFileModal
 
 pd = lazy_import("pandas")
 
@@ -22,7 +22,7 @@ View = namedtuple("View", ["name", "type"])
 Column = namedtuple("Column", ["name", "type"])
 
 
-class Clidb(App[None]):
+class LoQL(App[None]):
     "A Textual app for querying data files"
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
